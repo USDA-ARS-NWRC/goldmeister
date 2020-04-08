@@ -40,7 +40,8 @@ class GoldCompare():
         self.log = get_logger('gold.compare')
 
         if isdir(self.output):
-            self.log.warning("Removing preexisting output location {}".format(self.output))
+            self.log.warning("Removing preexisting output location {}"
+                             "".format(self.output))
             shutil.rmtree(self.output)
         os.mkdir(self.output)
 
@@ -68,74 +69,95 @@ class GoldCompare():
         '''
         Compare gold files by subtracting gold from compare.
         '''
+        new_data = {}
 
         for name, data in self.data.items():
+            new_data[name] = data.copy()
 
-            # f = name.split('-')[-1].split('_')[1:]split('.')[0] + '.nc'
-            # vn = "_".join(name.split('.')[-1].split('_')[1:])
-            # pretty_title = 'File: {} Varaible: {}'.format(f, vn)
+            f,v = name.split(':')
+            f = f.split('-')[-1]
+
+            pretty_title = 'File/variable: {}/{}'.format(f, v)
 
             self.log.info("")
-            self.log.info("Comparing {}...".format(name))
 
             # Calculate the differences
-            data['difference'] = data['compare'] - data['gold']
-            stats = get_stats(data['difference'])
+            dd = data['compare'] - data['gold']
+            new_data[name]['difference'] = dd
+            stats = get_stats(dd)
 
             # Log them
-            hdr = "{} Difference Statistics".format(name)
+            hdr = "{} Difference Statistics".format(pretty_title)
             banner = '=' * len(hdr)
             self.log.info(hdr)
             self.log.info(banner)
             for s, v in stats.items():
                 self.log.info('{:<30}{:<20}'.format(s, v))
 
+        return new_data
 
-    def plot_results(self, plot_original_data=False, show_plots=True,
+    def plot_results(self,results, plot_original_data=False, show_plots=True,
                                                      save_plots=True):
         '''
         Generate the plots showing the differences
+
+        Dictionary of dictionaries,
+
         '''
         # Plot order
-        labels = ['gold','compare','differences']
+        labels = ['gold','compare','difference']
 
         # If were plotting
         ncols = 1
         if plot_original_data:
             ncols = 3
 
-        fig, axes = plt.subplots(1, ncols)
+        for name, data in results.items():
+            fig, axes = plt.subplots(1, ncols)
 
-        if ncols == 1:
-            axes = [axes]
+            if ncols == 1:
+                axes = [axes]
 
-        for name, data in self.data.items():
-            f, v = name.split('.')
-            fname = ''.join(f.split('-')[1:]) + '.nc'
-            variable = ''.join(v[2:])
+            f, v = name.split(':')
+            fname = f.split('-')[-1]
+            variable = v
 
             fig_title = 'FILE: {}, Variable: {}'.format(fname, variable)
 
             # If were plotting the input images
             for i, ax in enumerate(axes):
-                input = labels[i]
+
+                if not plot_original_data:
+                    input = labels[2]
+                else:
+                    input = labels[i]
+
                 d = data[input]
+                self.log.debug('Plotting {} {}...'.format(variable, input))
                 nd = len(d.shape)
 
                 # 3D assume time is the first dimension, take the mean
                 if nd == 3:
-                    self.log.warning('Averaging data to timeseries mean for plotting only.')
-                    plot_d = d.mean(axis=3)
+                    self.log.warning('Averaging {} to timeseries mean for'
+                                     ' plotting only.'.format(variable))
+                    plot_d = d.mean(axis=0)
+
                 else:
                     plot_d = d
 
                 # If we have a vector, just use normal plot
                 if nd == 1:
-                    axes[i].plot(plot_d)
+                    im = axes[i].plot(plot_d)
 
                 # Use image plotting
                 else:
-                    axes[i].imshow(plot_d)
+                    if i == 2 or not plot_original_data:
+                        cmap = 'RdBu'
+                    else:
+                        cmap = 'jet'
+
+                    im = axes[i].imshow(plot_d, cmap=cmap)
+                    fig.colorbar(im, ax=axes[i])
 
                 if plot_original_data:
                     axes[i].set_title(input.title())
@@ -147,13 +169,16 @@ class GoldCompare():
                 # When plotting by itself there is only one subplot
                 plt.title('{} (Compare - Gold)'.format(fig_title))
 
-            if show_plots:
-                plt.show()
-
+            plt.tight_layout()
             if save_plots:
-                f = join(self.output, name + '.png')
+                f = join(self.output, "_".join([fname, v]) + '.png')
                 self.log.info("Saving figure to {}".format(f))
                 plt.savefig(f)
+
+            if show_plots:
+                plt.show()
+            plt.close()
+
 
 class GitGoldCompare(GoldCompare):
     '''
