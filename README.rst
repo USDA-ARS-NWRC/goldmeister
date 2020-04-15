@@ -14,24 +14,23 @@ Goldmeister
 Welcome!
 --------
 
-Python package to manage/examine changes to a gold file.
+Goldmeister is a Python package designed to manage/examine changes to a gold
+file.
 
 Whats a Gold File?
 ------------------
 
-A gold file a dataset that is being used to confirm that a repo 
-is behaving the same way before changes. Typically they are produced 
-at some point in time by the software and checked into a 
-repo to use for comparison during future code changes.
+A gold file is a dataset that is being used to confirm that a code set is
+behaving the same way before changes. Typically they are produced at some point
+in time by the software and checked into a repo to use for comparison during
+future code changes.
 
 
 What does Goldmeister do?
 -------------------------
 
-
-need to change a gold file and developers want to show the changes 
-that are occuring and how.
-
+When you need to change a gold file, developers can use Goldmeister to quickly
+show the changes that are occurring and how.
 
 * Free software: MIT license
 * Documentation: https://goldmeister.readthedocs.io.
@@ -41,6 +40,7 @@ Features
 --------
 
 * Bounce between git branches and check files.
+* Compare difference files
 * Plot analysis on how data is changing.
 * Supports netCDF only
 
@@ -48,8 +48,11 @@ Features
 Credits
 -------
 
+Developed at the USDA-ARS-NWRC for maintaining scientific code sets where
+repeatability is extremely important and thus Gold file affluent.
 
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
+This package was created with Cookiecutter_ and the
+`audreyr/cookiecutter-pypackage`_ project template.
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
