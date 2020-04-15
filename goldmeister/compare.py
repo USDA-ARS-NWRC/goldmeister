@@ -39,11 +39,25 @@ class GoldCompare():
 
         self.log = get_logger('gold.compare')
 
+        # Mange the output dir
         if isdir(self.output):
             self.log.warning("Removing preexisting output location {}"
                              "".format(self.output))
             shutil.rmtree(self.output)
         os.mkdir(self.output)
+
+        # Variables in netcdfs that we want to ignore
+        if 'ignore_vars' not in kwargs.keys():
+            self.ignore_vars = ['time', 'y', 'x', 'projection']
+        else:
+            self.ignore_vars = kwargs['ignore_vars']
+
+        # Naming convention for images in the that are loaded into self.data
+        self.key = 'file-{}:{}'
+
+        # Initialize the data structure
+        self.initialize()
+
 
     def read(self):
         '''
@@ -68,6 +82,10 @@ class GoldCompare():
     def compare(self):
         '''
         Compare gold files by subtracting gold from compare.
+
+        Returns:
+            new_data: Dictionary of keys filenames/variables of dictionaries
+                      carrying the gold, compare, and difference arrays
         '''
         new_data = {}
 
@@ -96,13 +114,19 @@ class GoldCompare():
 
         return new_data
 
-    def plot_results(self,results, plot_original_data=False, show_plots=True,
+    def plot_results(self, results, plot_original_data=False, show_plots=True,
                                                      save_plots=True):
         '''
         Generate the plots showing the differences
 
         Dictionary of dictionaries,
 
+        Args:
+            results: Dictionary as returned from compare for plotting
+            plot_original_data: Boolean indicating whether to add the original
+                                datasets to the subplots
+            show_plots: Boolean indicating where to plt.show() or not.
+            save_plots: Boolean where to save the figures to self.output
         '''
         # Plot order
         labels = ['gold','compare','difference']
@@ -179,6 +203,76 @@ class GoldCompare():
                 plt.show()
             plt.close()
 
+    def initialize(self):
+        '''
+        Initialize the data dictionary by looking at the first set of gold
+        files.
+
+        '''
+
+        self.log.info("Initializing data structure for {} files..."
+                      "".format(len(self.gold_files)))
+
+        empty_data = {'gold': None, 'compare': None, 'difference': None}
+
+        # Count how many images we are looking at
+        n_gold_imgs = 0
+
+        # Loop over each file and variable, initialize the dictionary data
+        for f in self.gold_files:
+            name = basename(f)
+            ds = Dataset(f)
+
+            for vname, v in ds.variables.items():
+                if vname not in self.ignore_vars:
+                    n_gold_imgs += 1
+                    self.data[self.key.format(name, vname)] = empty_data.copy()
+
+            ds.close()
+
+    def read_netcdf_data(self, files, is_gold=False):
+        '''
+        Reads all netcdf files and then each variable which is added to
+        self.data in the convention of
+
+        self.data[key] = {gold: np.array, compare: np.array, difference: np.array}
+
+        self.key is determining the top level naming convention which by
+        default is:
+        base_filename-netcdf_variable_name
+
+        This function only populates the compare and gold subkeys. Use the
+        boolean is_gold to assign to the gold subkey, otherwise the default
+        behavior assigns to the compare subkey.
+
+        To populate the difference subkey use self.compare.
+
+        Args:
+            files: List of files to be either used for compare or gold (basis) comparison.
+            is_gold: Boolean indicating if the data set the basis for
+                    comparison (compare - gold)
+        '''
+
+        if is_gold:
+            input = 'gold'
+        else:
+            input = 'compare'
+
+        # Loop over each file and variable
+        self.log.info('Reading data...')
+        for f in files:
+            # Use the basename of the file for the naming convention
+            name = basename(f)
+
+            # Load in each image to the data dictionary
+            ds = Dataset(f)
+            for vname, v in ds.variables.items():
+                # Ignore variable
+                if vname not in self.ignore_vars:
+                    self.log.debug('Adding {}'.format(vname))
+                    self.data[self.key.format(name, vname)][input] = v[:]
+            ds.close()
+
 
 class GitGoldCompare(GoldCompare):
     '''
@@ -193,12 +287,6 @@ class GitGoldCompare(GoldCompare):
         new_branch = kwargs['new_branch']
         old_branch = kwargs['old_branch']
 
-        # NC ignore var:
-        if 'ignore_vars' not in kwargs.keys():
-            self.ignore_vars = ['time', 'y', 'x', 'projection']
-        else:
-            self.ignore_vars = kwargs['ignore_vars']
-
         # Git Management
         self.repo = pygit2.Repository(path)
         self.new_branch = self.repo.branches[new_branch]
@@ -210,50 +298,17 @@ class GitGoldCompare(GoldCompare):
         Read in all the netcdfs into memory assign to the dictionary data
         '''
 
-        self.log.info("Initializing data structure for {} files..."
-                      "".format(len(self.gold_files)))
-
-        empty_data = {'gold': None, 'compare': None, 'difference': None}
-
-        # Key for naming the data, preserve the filename and var name
-        key = 'file-{}:{}'
-
-        # Count how many images we are looking at
-        n_gold_imgs = 0
-
-        # Loop over each file and variable, initialize the dictionary data
-        for f in self.gold_files:
-            name = basename(f)
-            ds = Dataset(f)
-
-            for vname, v in ds.variables.items():
-                if vname not in self.ignore_vars:
-                    n_gold_imgs += 1
-                    self.data[key.format(name, vname)] = empty_data.copy()
-
-            ds.close()
-
-        self.log.info("Comparing {} arrays across {} files."
-                      "".format(n_gold_imgs,len(self.gold_files)))
-
         # Loop over the two branches and store the data
         for i, br in enumerate([self.old_branch, self.new_branch]):
             self.log.info("Checking out branch {}...".format(br.branch_name))
             self.repo.checkout(br)
 
-            # Gold
+            # The old branch is the basis for comparison, e.g. gold file
             if i == 0:
-                input = 'gold'
+                is_gold = True
+
+            # The new branch is the comparator
             else:
-                input = 'compare'
+                is_gold = False
 
-            # Loop over each file and variable, initialize the dictionary data
-            self.log.info('Reading data...')
-            for f in self.gold_files:
-                name = basename(f)
-                ds = Dataset(f)
-
-                for vname, v in ds.variables.items():
-                    if vname not in self.ignore_vars:
-                        self.log.debug('Adding {}'.format(vname))
-                        self.data[key.format(name, vname)][input] = v[:]
+            self.read_netcdf_data(self.gold_files, is_gold=is_gold)
