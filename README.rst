@@ -3,12 +3,12 @@ Goldmeister
 ===========
 
 
-.. image:: https://img.shields.io/pypi/v/goldmeister.svg
-        :target: https://pypi.python.org/pypi/goldmeister
-
-.. image:: https://readthedocs.org/projects/goldmeister/badge/?version=latest
-        :target: https://goldmeister.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
+.. .. image:: https://img.shields.io/pypi/v/goldmeister.svg
+..         :target: https://pypi.python.org/pypi/goldmeister
+..
+.. .. image:: https://readthedocs.org/projects/goldmeister/badge/?version=latest
+..         :target: https://goldmeister.readthedocs.io/en/latest/?badge=latest
+..         :alt: Documentation Status
 
 
 Welcome!
@@ -48,7 +48,7 @@ Features
 Credits
 -------
 
-Developed at the USDA-ARS-NWRC for maintaining scientific code sets where
+Developed at the USDA-ARS-NWRC for maintaining scientific software where
 repeatability is extremely important and thus Gold file affluent.
 
 This package was created with Cookiecutter_ and the

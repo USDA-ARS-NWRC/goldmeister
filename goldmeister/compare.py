@@ -9,6 +9,7 @@ from netCDF4 import Dataset
 import numpy
 import pygit2
 import shutil
+import numpy as np
 from . utilities import get_logger
 
 class GoldCompare():
@@ -24,6 +25,12 @@ class GoldCompare():
     '''
 
     def __init__(self, **kwargs):
+        '''
+        Args:
+            only_report_nonzero: Boolean flag to suppress any output from
+                                differences that have a mean of zero
+        '''
+
         self.file_type = kwargs['file_type']
 
         if 'output_dir' not in kwargs.keys():
@@ -35,7 +42,12 @@ class GoldCompare():
         self.output = abspath(expanduser(self.output))
 
         self.gold_files = [abspath(expanduser(f)) for f in kwargs['gold_files']]
-        self.data = {}
+
+        # Handle optional Kwarg
+        if 'only_report_nonzero' in kwargs.keys():
+            self.only_report_nonzero = kwargs['only_report_nonzero']
+        else:
+            self.only_report_nonzero = False
 
         self.log = get_logger('gold.compare')
 
@@ -56,6 +68,7 @@ class GoldCompare():
         self.key = 'file-{}:{}'
 
         # Initialize the data structure
+        self.data = {}
         self.initialize()
 
     def read(self):
@@ -171,7 +184,6 @@ class GoldCompare():
 
             # Calculate the differences
             dd = data['compare'] - data['gold']
-            new_data[name]['difference'] = dd
             stats = get_stats(dd)
 
             # Log them
@@ -179,13 +191,21 @@ class GoldCompare():
             banner = '=' * len(hdr)
             self.log.info(hdr)
             self.log.info(banner)
-            for s, v in stats.items():
-                self.log.info('{:<30}{:<20}'.format(s, v))
+
+            if self.only_report_nonzero and stats['mean'] == 0.0:
+                self.log.info('No differences to report')
+                del new_data[name]
+
+            else:
+                new_data[name]['difference'] = dd
+                for s, v in stats.items():
+                    self.log.info('{:<30}{:<20}'.format(s, v))
 
         return new_data
 
     def plot_results(self, results, plot_original_data=False, show_plots=True,
-                                                     save_plots=True):
+                                                     save_plots=True,
+                                                     include_hist=False):
         '''
         Generate the plots showing the differences
 
@@ -197,14 +217,21 @@ class GoldCompare():
                                 datasets to the subplots
             show_plots: Boolean indicating where to plt.show() or not.
             save_plots: Boolean where to save the figures to self.output
+            plot_only_nozero_diff: Flag for only plotting differences with a non-zero mean
+            include_hist: Flag for adding a histogram of the differences to the plot
         '''
         # Plot order
-        labels = ['gold','compare','difference']
+        labels = ['difference']
 
-        # If were plotting
-        ncols = 1
+        # Add in a histogram of the plot
+        if include_hist:
+            labels.append('histogram')
+
         if plot_original_data:
-            ncols = 3
+            # Add in the gold and compare images in the beginning
+            labels = ['gold','compare'] + labels
+
+        ncols = len(labels)
 
         for name, data in results.items():
             fig, axes = plt.subplots(1, ncols)
@@ -220,14 +247,18 @@ class GoldCompare():
 
             # If were plotting the input images
             for i, ax in enumerate(axes):
+                # Which input are we using (gold, compare, etc..)
+                input = labels[i]
 
-                if not plot_original_data:
-                    input = labels[2]
+                # Handle the histogram, then grab the difference since histogram is not in the data structure
+                if input == 'histogram':
+                    d = data['difference']
                 else:
-                    input = labels[i]
+                    d = data[input]
 
-                d = data[input]
                 self.log.debug('Plotting {} {}...'.format(variable, input))
+
+                # Grab the dimensionality
                 nd = len(d.shape)
 
                 # 3D assume time is the first dimension, take the mean
@@ -243,15 +274,24 @@ class GoldCompare():
                 if nd == 1:
                     im = axes[i].plot(plot_d)
 
-                # Use image plotting
+                # Use image plotting for either time avg data or other 2D data
                 else:
                     if i == 2 or not plot_original_data:
                         cmap = 'RdBu'
                     else:
                         cmap = 'jet'
 
-                    im = axes[i].imshow(plot_d, cmap=cmap)
-                    fig.colorbar(im, ax=axes[i])
+
+                    # Manage the image plots or histograms
+                    if input == 'histogram':
+                        hist_lbl = ("Min: {:.3E}\nMax: {:.3E}\nMean: {:.3E}"
+                                    "").format(plot_d.min(), plot_d.max(),
+                                                             plot_d.mean())
+                        axes[i].hist(plot_d.flatten(), label=hist_lbl)
+                        axes[i].legend()
+                    else:
+                        im = axes[i].imshow(plot_d, cmap=cmap)
+                        fig.colorbar(im, ax=axes[i])
 
                 if plot_original_data:
                     axes[i].set_title(input.title())
@@ -328,9 +368,11 @@ class GoldFilesCompare(GoldCompare):
         N_Gold = len(self.gold_files)
 
         if N_Gold != N_Compare:
-            raise ValueError("Number of compare files must be the same as the "
+            emsg = ("Number of compare files must be the same as the "
                              "number of gold files provided.\n N_Compare = {} "
                              "vs N_Gold = {}".format(N_Compare, N_Gold))
+            self.log.error(emsg)
+            raise ValueError(emsg)
 
         self.read()
 
