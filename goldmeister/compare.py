@@ -5,6 +5,8 @@ from os.path import join, abspath, expanduser, basename, isdir
 import os
 from spatialnc.analysis import get_stats
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 from netCDF4 import Dataset
 import numpy
 import pygit2
@@ -289,21 +291,22 @@ class GoldCompare():
                                                              plot_d.mean())
                         axes[i].hist(plot_d.flatten(), label=hist_lbl)
                         axes[i].legend()
+
                     else:
                         im = axes[i].imshow(plot_d, cmap=cmap)
-                        fig.colorbar(im, ax=axes[i])
+                        fig.colorbar(im, ax=axes[i], fraction=0.046, pad=0.04)
 
-                if plot_original_data:
+
+                if not plot_original_data:
                     axes[i].set_title(input.title())
 
-            if plot_original_data:
-                plt.suptitle(fig_title)
+                # Set the aspect ratio so the plots don't look odd with a hist
+                asp = np.diff(axes[i].get_xlim())[0] / np.diff(axes[i].get_ylim())[0]
+                axes[i].set_aspect(abs(asp))
 
-            else:
-                # When plotting by itself there is only one subplot
-                plt.title('{} (Compare - Gold)'.format(fig_title))
-
+            plt.suptitle(fig_title)
             plt.tight_layout()
+
             if save_plots:
                 f = join(self.output, "_".join([fname, v]) + '.png')
                 self.log.info("Saving figure to {}".format(f))
