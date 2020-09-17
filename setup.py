@@ -19,13 +19,13 @@ setup_requirements = ['pytest-runner', ]
 test_requirements = ['pytest>=3', ]
 
 setup(
-    author="Micah Johnson",
-    author_email='micah.johnson150@gmail.com',
+    author="USDA-ARS-NWRC",
+    author_email='snow@ars.usda.gov',
     python_requires='>=3.5',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License',
+        'License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
@@ -35,7 +35,7 @@ setup(
     ],
     description="Python package for comparing dataset changes in a repos that have output files they check",
     install_requires=requirements,
-    license="MIT license",
+    license="CC0 1.0",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
     keywords='goldmeister',
@@ -44,7 +44,7 @@ setup(
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
-    url='https://github.com/micahjohnson150/goldmeister',
+    url='https://github.com/USDA-ARS-NWRC/goldmeister',
     version='0.2.0',
     zip_safe=False,
 )
